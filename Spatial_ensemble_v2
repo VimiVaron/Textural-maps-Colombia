@@ -1,0 +1,203 @@
+rm(list=ls())
+
+### Set directory###
+directory<- "C:\\Users\\vimiv\\OneDrive - AGROSAVIA - CORPORACION COLOMBIANA DE INVESTIGACION AGROPECUARIA\\Documentos\\Texture\\Script"
+setwd(paste0(directory))
+
+library(raster)
+
+### Ensemble function ###
+ensemble <- function(predvalues, serrors, basemap = 1){
+  serrors <- round(serrors, 2)
+  result <- predvalues[[basemap]]
+  names(result) <- 'result'
+  model <- raster(predvalues[[1]])
+  values(model) <- basemap
+  model[is.na(result)] <- NA
+  minerror <- min(stack(serrors))
+  names(model) <- "model"
+  names(minerror) <- "error"
+  for(i in 2:nlayers(predvalues)){
+    result[serrors[[i]] == minerror] <- predvalues[[i]][serrors[[i]] == minerror]
+    model[serrors[[i]] == minerror] <- i
+  }
+  minerror <- mask(minerror, result)
+  model <- mask(model, result)
+  return(stack(result, minerror, model))
+}
+
+###depth definition#####
+prof<-"60_100" #"0_5","5_15","15_30","30_60","60_100"
+prof
+
+#### load errors ####
+
+RES_MACHISPLIN_Clay<-raster(paste0("Results/OK/MACHISPLIN_OK_residuals_Clay_",prof,".tif"))
+RES_landmap_Clay<-raster(paste0("Results/OK/landmap_OK_residuals_Clay_",prof,".tif"))
+RES_landmap_Clay<-resample(RES_landmap_Clay,RES_MACHISPLIN_Clay,method="bilinear")
+RES_SG_Clay<-raster(paste0("Results/OK/SG_OK_residuals_Clay_",prof,".tif"))
+RES_SG_Clay<-resample(RES_SG_Clay,RES_MACHISPLIN_Clay,method="bilinear")
+
+RES_MACHISPLIN_Sand<-raster(paste0("Results/OK/MACHISPLIN_OK_residuals_Sand_",prof,".tif"))
+RES_landmap_Sand<-raster(paste0("Results/OK/landmap_OK_residuals_Sand_",prof,".tif"))
+RES_landmap_Sand<-resample(RES_landmap_Sand,RES_MACHISPLIN_Sand,method="bilinear")
+RES_SG_Sand<-raster(paste0("Results/OK/SG_OK_residuals_Sand_",prof,".tif"))
+RES_SG_Sand<-resample(RES_SG_Sand,RES_MACHISPLIN_Sand,method="bilinear")
+
+RES_MACHISPLIN_Silt<-raster(paste0("Results/OK/MACHISPLIN_OK_residuals_Silt_",prof,".tif"))
+RES_landmap_Silt<-raster(paste0("Results/OK/landmap_OK_residuals_Silt_",prof,".tif"))
+RES_landmap_Silt<-resample(RES_landmap_Silt,RES_MACHISPLIN_Silt,method="bilinear")
+RES_SG_Silt<-raster(paste0("Results/OK/SG_OK_residuals_Silt_",prof,".tif"))
+RES_SG_Silt<-resample(RES_SG_Silt,RES_MACHISPLIN_Silt,method="bilinear")
+
+#### Mean Absolute Error (MAE) calculation ####
+
+MACHISPLIN_ERROR_ABS<-(abs(RES_MACHISPLIN_Clay)+ abs(RES_MACHISPLIN_Sand)+abs(RES_MACHISPLIN_Silt))/3
+landmap_ERROR_ABS<-(abs(RES_landmap_Clay)+ abs(RES_landmap_Sand)+abs(RES_landmap_Silt))/3
+SG_ERROR_ABS<-(abs(RES_SG_Clay)+ abs(RES_SG_Sand)+abs(RES_SG_Silt))/3
+
+residuals<-stack(MACHISPLIN_ERROR_ABS,landmap_ERROR_ABS,SG_ERROR_ABS)
+names(residuals)<-c("ERROR_MACHISPLIN","ERROR_landmap","ERROR_SG")
+
+####Clay: create stack
+
+MACHISPLIN_Clay<-raster(paste0("Results/MACHISPLIN/Text_fractions/MACHISPLIN_Clay_",prof,".tif"))
+proj4string(MACHISPLIN_Clay) <- CRS("+init=epsg:4326")
+MACHISPLIN_Clay<-projectRaster(MACHISPLIN_Clay,crs=CRS("+init=epsg:3116"))
+landmap_Clay<-raster(paste0("Results/landmap/Text_fractions/landmap_Clay_",prof,".tif"))
+proj4string(landmap_Clay) <- CRS("+init=epsg:3116")
+landmap_Clay<-resample(landmap_Clay,MACHISPLIN_Clay,method="bilinear")
+SG_Clay<-raster(paste0("Results/SG/Text_fractions/SG_Clay_",prof,".tif"))
+proj4string(SG_Clay) <- CRS("+init=epsg:3116")
+SG_Clay<-resample(SG_Clay,MACHISPLIN_Clay,method="bilinear")
+
+predictions_clay <-stack(MACHISPLIN_Clay,landmap_Clay,SG_Clay)
+names(predictions_clay)<-c("MACHISPLIN_Clay","landmap_Clay","SG_Clay")
+
+residuals<-projectRaster(residuals,predictions_clay)
+
+#check names
+print(data.frame(predictions = names(predictions_clay), serrros = names(residuals)))
+
+#Ensemble
+start <- Sys.time()
+result_Clay <- ensemble(predvalues=predictions_clay, serrors=abs(residuals))
+print(Sys.time() - start)
+
+#plot
+plot(result_Clay)
+
+#exportind min error and model selected # 
+writeRaster(result_Clay[[2]],paste0("Results/Ensemble/Text_fractions/Min_MAE_",prof,".tif"),overwrite=TRUE)
+writeRaster(result_Clay[[3]],paste0("Results/Ensemble/Text_fractions/Model_selected_",prof,".tif"),overwrite=TRUE)
+
+#export prediction
+writeRaster(result_Clay[[1]],paste0("Results/Ensemble/Text_fractions/Ensemble_Clay_",prof,".tif"),overwrite=TRUE)
+
+
+####Sand: create stack
+
+MACHISPLIN_Sand<-raster(paste0("Results/MACHISPLIN/Text_fractions/MACHISPLIN_Sand_",prof,".tif"))
+proj4string(MACHISPLIN_Sand) <- CRS("+init=epsg:4326")
+MACHISPLIN_Sand<-projectRaster(MACHISPLIN_Sand,crs=CRS("+init=epsg:3116"))
+landmap_Sand<-raster(paste0("Results/landmap/Text_fractions/landmap_Sand_",prof,".tif"))
+proj4string(landmap_Sand) <- CRS("+init=epsg:3116")
+landmap_Sand<-resample(landmap_Sand,MACHISPLIN_Sand,method="bilinear")
+SG_Sand<-raster(paste0("Results/SG/Text_fractions/SG_Sand_",prof,".tif"))
+proj4string(SG_Sand) <- CRS("+init=epsg:3116")
+SG_Sand<-resample(SG_Sand,MACHISPLIN_Sand,method="bilinear")
+
+predictions_Sand <-stack(MACHISPLIN_Sand,landmap_Sand,SG_Sand)
+names(predictions_Sand)<-c("MACHISPLIN_Sand","landmap_Sand","SG_Sand")
+
+#check names
+print(data.frame(predictions = names(predictions_Sand), serrros = names(residuals)))
+
+#ensemble
+start <- Sys.time()
+result_Sand <- ensemble(predvalues=predictions_Sand, serrors=abs(residuals))
+print(Sys.time() - start)
+
+#plot map
+plot(result_Sand)
+
+#export map
+writeRaster(result_Sand[[1]],paste0("Results/Ensemble/Text_fractions/Ensemble_Sand_",prof,".tif"),overwrite=TRUE)
+
+
+####Silt: create stack
+
+MACHISPLIN_Silt<-raster(paste0("Results/MACHISPLIN/Text_fractions/MACHISPLIN_Silt_",prof,".tif"))
+proj4string(MACHISPLIN_Silt) <- CRS("+init=epsg:4326")
+MACHISPLIN_Silt<-projectRaster(MACHISPLIN_Silt,crs=CRS("+init=epsg:3116"))
+landmap_Silt<-raster(paste0("Results/landmap/Text_fractions/landmap_Silt_",prof,".tif"))
+proj4string(landmap_Silt) <- CRS("+init=epsg:3116")
+landmap_Silt<-resample(landmap_Silt,MACHISPLIN_Silt,method="bilinear")
+SG_Silt<-raster(paste0("Results/SG/Text_fractions/SG_Silt_",prof,".tif"))
+proj4string(SG_Silt) <- CRS("+init=epsg:3116")
+SG_Silt<-resample(SG_Silt,MACHISPLIN_Silt,method="bilinear")
+
+predictions_Silt <-stack(MACHISPLIN_Silt,landmap_Silt,SG_Silt)
+names(predictions_Silt)<-c("MACHISPLIN_Silt","landmap_Silt","SG_Silt")
+
+#check names
+print(data.frame(predictions = names(predictions_Silt), serrros = names(residuals)))
+
+#ensemble
+start <- Sys.time()
+result_Silt <- ensemble(predvalues=predictions_Silt, serrors=abs(residuals))
+print(Sys.time() - start)
+
+#plot map
+plot(result_Silt)
+
+#export map
+writeRaster(result_Silt[[1]],paste0("Results/Ensemble/Text_fractions/Ensemble_Silt_",prof,".tif"),overwrite=TRUE)
+
+
+
+
+####Final error calculation
+
+##load model selected - This applies for all PSF, but chage with dept
+model<-raster(paste0("Results/Ensemble/Text_fractions/Model_selected_",prof,".tif")) 
+model<-projectRaster(model,error_clay)
+model <- round(model, 0)
+
+
+#Clay
+error_clay<-stack(RES_MACHISPLIN_Clay,RES_landmap_Clay,RES_SG_Clay)
+result <- error_clay[[1]]
+
+for(i in 2:nlayers(error_clay)){
+  result[model == i] <- error_clay[[i]][model == i]
+ }
+plot(result)
+
+#save final error of clay
+writeRaster(result,paste0("Results/Ensemble/Text_fractions/Ensemble_error_Clay_",prof,".tif"),overwrite=TRUE)
+
+
+#Sand
+error_Sand<-stack(RES_MACHISPLIN_Sand,RES_landmap_Sand,RES_SG_Sand)
+result <- error_Sand[[1]]
+
+for(i in 2:nlayers(error_Sand)){
+  result[model == i] <- error_Sand[[i]][model == i]
+}
+plot(result)
+#save final error of sand
+writeRaster(result,paste0("Results/Ensemble/Text_fractions/Ensemble_error_Sand_",prof,".tif"),overwrite=TRUE)
+
+
+#Silt
+error_Silt<-stack(RES_MACHISPLIN_Silt,RES_landmap_Silt,RES_SG_Silt)
+result <- error_Silt[[1]]
+
+for(i in 2:nlayers(error_Silt)){
+  result[model == i] <- error_Silt[[i]][model == i]
+}
+plot(result)
+
+#save final error of silt
+writeRaster(result,paste0("Results/Ensemble/Text_fractions/Ensemble_error_Silt_",prof,".tif"),overwrite=TRUE)
