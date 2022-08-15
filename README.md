@@ -1,0 +1,2 @@
+# Textural-maps-Colombia
+This repository contains a compilation of files, scripts, and folders to reproduce the soil texture maps in Colombia. The final maps are available in EDI Repository (Varón-Ramírez et al., 2022). Varón-Ramírez, V.M., G.A. Araujo-Carrillo, and M. Guevara. 2022. Textural soil maps, Colombia, 0 - 100 cm ver 2. Environmental Data Initiative. https://doi.org/10.6073/pasta/81341392b97157479e01d594e7e78eb9.
