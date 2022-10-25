@@ -1,3 +1,9 @@
+# The authors acknowledge the contributions from 
+# Guillermo Olmedo <guillermo.olmedo@gmail.com> and 
+# Carlos Eduardo Arroyo Cruz <dreamwalker7777@hotmail.com>
+# developing of the ensemble function.
+
+##############
 rm(list=ls())
 
 ### Set directory###
